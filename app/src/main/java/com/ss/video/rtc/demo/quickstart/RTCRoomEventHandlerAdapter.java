@@ -14,6 +14,8 @@ import com.ss.bytertc.engine.type.StreamRemoveReason;
 import java.nio.ByteBuffer;
 
 public class RTCRoomEventHandlerAdapter extends IRTCRoomEventHandler {
+
+
     @Override
     public void onLeaveRoom(RTCRoomStats stats) {
 

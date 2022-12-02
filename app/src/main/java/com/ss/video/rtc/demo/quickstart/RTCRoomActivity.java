@@ -3,20 +3,30 @@ package com.ss.video.rtc.demo.quickstart;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.TextureView;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.ss.bytertc.engine.RTCEngine;
 import com.ss.bytertc.engine.RTCRoom;
 import com.ss.bytertc.engine.RTCRoomConfig;
+import com.ss.bytertc.engine.type.RTCRoomStats;
 import com.ss.bytertc.engine.RTCVideo;
 import com.ss.bytertc.engine.UserInfo;
 import com.ss.bytertc.engine.VideoCanvas;
@@ -32,8 +42,11 @@ import com.ss.bytertc.engine.type.ChannelProfile;
 import com.ss.bytertc.engine.type.MediaStreamType;
 import com.ss.rtc.demo.quickstart.R;
 
+
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Locale;
+import java.util.TreeMap;
 
 /**
  * VolcEngineRTC 视频通话的主页面
@@ -73,10 +86,15 @@ import java.util.Locale;
  * 详细的API文档参见{https://www.volcengine.com/docs/6348/70080}
  */
 public class RTCRoomActivity extends AppCompatActivity {
+    private String code;
+    //private TreeMap<String, String> room = new TreeMap<>();
 
     private ImageView mSpeakerIv;
     private ImageView mAudioIv;
     private ImageView mVideoIv;
+
+    private TextView mInputSendTv;
+    private EditText mInputEt;
 
     private boolean mIsSpeakerPhone = true;
     private boolean mIsMuteAudio = false;
@@ -90,6 +108,9 @@ public class RTCRoomActivity extends AppCompatActivity {
 
     private RTCVideo mRTCVideo;
     private RTCRoom mRTCRoom;
+    private RecyclerView mRecyclerView; //聊天区RV
+    private ChatAdapter mChatAdapter = new ChatAdapter();  //聊天适配器
+
 
     private RTCRoomEventHandlerAdapter mIRtcRoomEventHandler = new RTCRoomEventHandlerAdapter() {
 
@@ -100,6 +121,7 @@ public class RTCRoomActivity extends AppCompatActivity {
         public void onUserJoined(UserInfo userInfo, int elapsed) {
             super.onUserJoined(userInfo, elapsed);
             Log.d("IRTCRoomEventHandler", "onUserJoined: " + userInfo.getUid());
+            //mRTCRoomStats.users += 1;
         }
 
         /**
@@ -110,7 +132,29 @@ public class RTCRoomActivity extends AppCompatActivity {
             super.onUserLeave(uid, reason);
             Log.d("IRTCRoomEventHandler", "onUserLeave: " + uid);
             runOnUiThread(() -> removeRemoteView(uid));
+            //mRTCRoomStats.users -= 1;
         }
+
+        @Override
+        public void onRoomMessageSendResult(long msgid, int error) {
+            super.onRoomMessageSendResult(msgid, error);
+            String tip;
+            if (error != 0) {
+                tip = String.format(Locale.US, "房间消息发送失败(%d)", error);
+            } else {
+                tip = "消息发送成功";
+            }
+            //runOnUiThread(() -> Toast.makeText(RTCRoomActivity.this, tip, Toast.LENGTH_SHORT).show());
+        }
+
+
+        @Override
+        public void onRoomMessageReceived(String uid, String message) {
+            super.onRoomMessageReceived(uid, message);
+            showMessage(uid, message);
+        }
+
+
     };
 
     private IRTCVideoEventHandler mIRtcVideoEventHandler = new IRTCVideoEventHandler() {
@@ -145,18 +189,62 @@ public class RTCRoomActivity extends AppCompatActivity {
         }
     };
 
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_room);
 
+
         Intent intent = getIntent();
         String roomId = intent.getStringExtra(Constants.ROOM_ID_EXTRA);
         String userId = intent.getStringExtra(Constants.USER_ID_EXTRA);
+        String codeId = intent.getStringExtra(Constants.CODE_ID_EXTRA);
 
         initUI(roomId, userId);
         initEngineAndJoinRoom(roomId, userId);
+        sendMessage(userId);
+
     }
+
+    //光标和软键盘的问题
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        mInputEt = findViewById(R.id.input_et);
+        if (null != this.getCurrentFocus()) {
+            InputMethodManager mInputMethodManager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            assert mInputMethodManager != null;
+            mInputEt.setCursorVisible(false);
+            return mInputMethodManager.hideSoftInputFromWindow(this.getCurrentFocus().getWindowToken(), 0);
+        }
+        return super.onTouchEvent(event);
+    }
+
+    //处理发消息
+    private void sendMessage(String userId){
+        mRecyclerView = findViewById(R.id.main_chat_rv);
+        mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        mRecyclerView.setAdapter(mChatAdapter);
+
+        mInputSendTv = findViewById(R.id.input_send);
+        mInputEt = findViewById(R.id.input_et);
+
+        mInputEt.setOnClickListener((v) -> {mInputEt.setCursorVisible(true);});
+
+        mInputSendTv.setOnClickListener( (view -> {
+            String inputMessage = mInputEt.getText().toString();
+            if (inputMessage.equals("")) Toast.makeText(this,"发送信息不可为空", Toast.LENGTH_SHORT).show();
+            else {
+                mChatAdapter.addChatMsg(userId + ": " + inputMessage);
+                mInputEt.setText("");
+                mRTCRoom.sendRoomMessage(userId + ": " + inputMessage);
+            }
+        }));
+
+    }
+
+
 
     private void initUI(String roomId, String userId) {
         mSelfContainer = findViewById(R.id.self_video_container);
@@ -200,8 +288,8 @@ public class RTCRoomActivity extends AppCompatActivity {
                 UserInfo.create(userId, ""), roomConfig);
         Log.i("TAG", "initEngineAndJoinRoom: " + joinRoomRes);
     }
-
     private void setLocalRenderView(String uid) {
+
         VideoCanvas videoCanvas = new VideoCanvas();
         TextureView renderView = new TextureView(this);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
@@ -326,5 +414,11 @@ public class RTCRoomActivity extends AppCompatActivity {
         mIRtcVideoEventHandler = null;
         mIRtcRoomEventHandler = null;
         mRTCVideo = null;
+    }
+
+    private void showMessage(String uid, String message) {
+        runOnUiThread(() -> {
+            mChatAdapter.addChatMsg(message);
+        });
     }
 }

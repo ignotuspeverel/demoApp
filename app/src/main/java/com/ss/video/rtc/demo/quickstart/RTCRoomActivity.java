@@ -134,6 +134,10 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
             listener = context;
         }
 
+        private double NormalizedTunableSigmoidFunction(double x, double k) {
+            return (x - k * x) / (k - 2 * k * Math.abs(x) + 1);
+        }
+
         @Override
         protected Void doInBackground(Object[] objects) {
             RTCRoomActivity activity = activityReference.get();
@@ -143,10 +147,11 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
                 if(activity.ChatActivityTimeLock.tryLock()){
                     try {
                         if (System.currentTimeMillis() - activity.LastChatActivityTime > 5000 && mRecyclerView.getVisibility() == View.VISIBLE) {
-                            float alpha = (10000 - System.currentTimeMillis() + activity.LastChatActivityTime) / 5000f;
+                            double alpha = (10000 - System.currentTimeMillis() + activity.LastChatActivityTime) / 5000f;
                             if (alpha < 0) alpha = 0;
                             if (alpha > 1) alpha = 1;
-                            listener.setChatAlpha(alpha);
+                            alpha = NormalizedTunableSigmoidFunction(alpha, -0.75);
+                            listener.setChatAlpha((float) alpha);
                         }
                         if (System.currentTimeMillis() - activity.LastChatActivityTime > 10000) {
                             listener.setChatVisibility(View.INVISIBLE);
@@ -161,7 +166,7 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
                 }
 
                 try {
-                    Thread.sleep(100);
+                    Thread.sleep(10);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                     break;

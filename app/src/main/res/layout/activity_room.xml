@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/grey"
+    android:background="@drawable/activity_background"
     tools:context="com.ss.video.rtc.demo.quickstart.RTCRoomActivity"
     tools:ignore="ContentDescription,RtlHardcoded,SpUsage">
 
@@ -12,7 +12,6 @@
         android:id="@+id/title_bar"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:background="@color/white"
         app:layout_constraintTop_toTopOf="parent">
 
         <ImageView
@@ -35,8 +34,10 @@
             android:maxLength="15"
             android:maxLines="1"
             android:singleLine="true"
-            android:textColor="@color/black"
-            android:textSize="18dp"
+            android:textAllCaps="true"
+            android:textColor="@color/white"
+            android:textSize="22dp"
+            android:textStyle="bold"
             tools:text="ID:userid" />
 
         <ImageView
@@ -53,8 +54,8 @@
     <FrameLayout
         android:id="@+id/bottom_bar"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:background="@color/white"
+        android:layout_height="80dp"
+        android:background="#02111C"
         android:paddingBottom="10dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
@@ -66,14 +67,6 @@
             android:layout_marginLeft="16dp"
             android:src="@drawable/normal_audio" />
 
-        <ImageView
-            android:id="@+id/message_room"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_gravity="center_vertical"
-            android:layout_marginLeft="100dp"
-            android:visibility="visible"
-            app:srcCompat="@android:drawable/sym_action_email" />
 
         <ImageView
             android:id="@+id/hang_up"
@@ -95,7 +88,7 @@
         android:id="@+id/self_video_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toTopOf="@id/remote_video_1_container"
+        app:layout_constraintBottom_toTopOf="@id/remote_video_3_container"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toLeftOf="@id/remote_video_0_container"
         app:layout_constraintTop_toBottomOf="@id/title_bar" />
@@ -104,8 +97,9 @@
         android:id="@+id/self_video_user_id_tv"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@color/purple_700"
-        android:textSize="14dp"
+        android:textColor="@color/white"
+        android:textSize="7dp"
+        android:background="@drawable/join_room_btn_bg"
         app:layout_constraintBottom_toBottomOf="@id/self_video_container"
         app:layout_constraintRight_toRightOf="@id/self_video_container" />
 
@@ -113,17 +107,18 @@
         android:id="@+id/remote_video_0_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toTopOf="@id/remote_video_2_container"
+        app:layout_constraintBottom_toTopOf="@id/remote_video_4_container"
         app:layout_constraintLeft_toRightOf="@id/self_video_container"
-        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintRight_toLeftOf="@id/remote_video_1_container"
         app:layout_constraintTop_toBottomOf="@id/title_bar" />
 
     <TextView
         android:id="@+id/remote_video_0_user_id_tv"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@color/purple_700"
-        android:textSize="14dp"
+        android:textColor="@color/white"
+        android:textSize="7dp"
+        android:background="@drawable/join_room_btn_bg"
         app:layout_constraintBottom_toBottomOf="@id/remote_video_0_container"
         app:layout_constraintRight_toRightOf="@id/remote_video_0_container" />
 
@@ -131,20 +126,18 @@
         android:id="@+id/remote_video_1_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toTopOf="@id/bottom_bar"
-        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/remote_video_5_container"
+        app:layout_constraintLeft_toRightOf="@id/remote_video_0_container"
         app:layout_constraintRight_toLeftOf="@id/remote_video_2_container"
-        app:layout_constraintTop_toBottomOf="@id/self_video_container" >
-
-
-    </FrameLayout>
+        app:layout_constraintTop_toBottomOf="@id/title_bar" />
 
     <TextView
         android:id="@+id/remote_video_1_user_id_tv"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@color/purple_700"
-        android:textSize="14dp"
+        android:textColor="@color/white"
+        android:textSize="7dp"
+        android:background="@drawable/join_room_btn_bg"
         app:layout_constraintBottom_toBottomOf="@id/remote_video_1_container"
         app:layout_constraintRight_toRightOf="@id/remote_video_1_container" />
 
@@ -152,35 +145,121 @@
         android:id="@+id/remote_video_2_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toTopOf="@id/bottom_bar"
+        app:layout_constraintBottom_toTopOf="@id/remote_video_6_container"
         app:layout_constraintLeft_toRightOf="@id/remote_video_1_container"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/remote_video_0_container" />
+        app:layout_constraintTop_toBottomOf="@id/title_bar" />
 
     <TextView
         android:id="@+id/remote_video_2_user_id_tv"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textColor="@color/purple_700"
-        android:textSize="14dp"
+        android:textColor="@color/white"
+        android:textSize="7dp"
+        android:background="@drawable/join_room_btn_bg"
         app:layout_constraintBottom_toBottomOf="@id/remote_video_2_container"
         app:layout_constraintRight_toRightOf="@id/remote_video_2_container" />
+
+    <FrameLayout
+        android:id="@+id/remote_video_3_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/main_chat_rv"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@id/remote_video_4_container"
+        app:layout_constraintTop_toBottomOf="@id/self_video_container" />
+
+    <TextView
+        android:id="@+id/remote_video_3_user_id_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/white"
+        android:textSize="7dp"
+        android:background="@drawable/join_room_btn_bg"
+        app:layout_constraintBottom_toBottomOf="@id/remote_video_3_container"
+        app:layout_constraintRight_toRightOf="@id/remote_video_3_container" />
+
+    <FrameLayout
+        android:id="@+id/remote_video_4_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/main_chat_rv"
+        app:layout_constraintLeft_toRightOf="@id/remote_video_3_container"
+        app:layout_constraintRight_toLeftOf="@id/remote_video_5_container"
+        app:layout_constraintTop_toBottomOf="@id/remote_video_0_container" />
+
+    <TextView
+        android:id="@+id/remote_video_4_user_id_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/white"
+        android:textSize="7dp"
+        android:background="@drawable/join_room_btn_bg"
+        app:layout_constraintBottom_toBottomOf="@id/remote_video_4_container"
+        app:layout_constraintRight_toRightOf="@id/remote_video_4_container" />
+
+    <FrameLayout
+        android:id="@+id/remote_video_5_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/main_chat_rv"
+        app:layout_constraintLeft_toRightOf="@id/remote_video_4_container"
+        app:layout_constraintRight_toLeftOf="@id/remote_video_6_container"
+        app:layout_constraintTop_toBottomOf="@id/remote_video_1_container" />
+
+    <TextView
+        android:id="@+id/remote_video_5_user_id_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/white"
+        android:textSize="7dp"
+        android:background="@drawable/join_room_btn_bg"
+        app:layout_constraintBottom_toBottomOf="@id/remote_video_5_container"
+        app:layout_constraintRight_toRightOf="@id/remote_video_5_container" />
+
+    <FrameLayout
+        android:id="@+id/remote_video_6_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/main_chat_rv"
+        app:layout_constraintLeft_toRightOf="@id/remote_video_5_container"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/remote_video_2_container" />
+
+    <TextView
+        android:id="@+id/remote_video_6_user_id_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/white"
+        android:textSize="7dp"
+        android:background="@drawable/join_room_btn_bg"
+        app:layout_constraintBottom_toBottomOf="@id/remote_video_6_container"
+        app:layout_constraintRight_toRightOf="@id/remote_video_6_container" />
+
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/main_chat_rv"
         android:layout_width="match_parent"
-        android:layout_height="250dp"
+        android:layout_height="200dp"
         android:layout_marginHorizontal="16dp"
+        android:layout_marginStart="16dp"
         android:layout_marginTop="20dp"
-        android:layout_marginBottom="120dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="160dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/input_et"
-        tools:listitem="@layout/item_voice_chat_demo_chat"/>
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintLeft_toRightOf="parent"
+        app:layout_constraintRight_toLeftOf="parent"
+        app:layout_constraintVertical_bias="0.996"
+        tools:listitem="@layout/item_voice_chat_demo_chat" />
+
     <FrameLayout
         android:id="@+id/input_layout"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginBottom="60dp"
-        android:background="#F20E0825"
+        android:layout_marginBottom="80dp"
+        android:background="#F2081525"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
         app:layout_constraintBottom_toBottomOf="parent">
@@ -188,31 +267,47 @@
         <EditText
             android:id="@+id/input_et"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="50dp"
             android:layout_gravity="center_vertical"
             android:layout_marginLeft="16dp"
             android:layout_marginRight="88dp"
-
             android:ellipsize="end"
             android:gravity="center_vertical"
-            android:hint="说点什么"
+            android:hint="Say something !"
             android:maxLines="3"
             android:minHeight="36dp"
             android:paddingHorizontal="16dp"
             android:textColor="@color/white"
             android:textColorHint="#46FFFFFF"
-            android:textSize="14dp" />
+            android:textSize="14dp"
+            android:background="@null"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+
+        <View
+            android:layout_width="260dp"
+            android:layout_height="38sp"
+            android:layout_marginLeft="16dp"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/option_input_bg"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="@id/input_et"
+            app:layout_constraintTop_toTopOf="@id/input_layout" />
 
         <TextView
             android:id="@+id/input_send"
             android:layout_width="60dp"
-            android:layout_height="28dp"
+            android:layout_height="30dp"
             android:layout_gravity="right|bottom"
+            android:layout_marginLeft="16dp"
             android:layout_marginRight="16dp"
-            android:layout_marginBottom="4dp"
+            android:layout_marginBottom="10dp"
             android:background="#1664FF"
             android:gravity="center"
-            android:text="发送"
+            android:text="send"
             android:textColor="@color/white"
             android:textSize="14dp" />
     </FrameLayout>

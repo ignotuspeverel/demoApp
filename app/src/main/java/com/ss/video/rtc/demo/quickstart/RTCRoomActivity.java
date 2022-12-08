@@ -44,6 +44,7 @@ import com.ss.rtc.demo.quickstart.R;
 
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.TreeMap;
@@ -102,14 +103,17 @@ public class RTCRoomActivity extends AppCompatActivity {
     private CameraId mCameraID = CameraId.CAMERA_ID_FRONT;
 
     private FrameLayout mSelfContainer;
-    private final FrameLayout[] mRemoteContainerArray = new FrameLayout[3];
-    private final TextView[] mUserIdTvArray = new TextView[3];
-    private final String[] mShowUidArray = new String[3];
+    private final FrameLayout[] mRemoteContainerArray = new FrameLayout[7];
+    //private List<FrameLayout> mRemoteList = new ArrayList<>();
+    private final TextView[] mUserIdTvArray = new TextView[7];
+    private final String[] mShowUidArray = new String[7];
 
     private RTCVideo mRTCVideo;
     private RTCRoom mRTCRoom;
     private RecyclerView mRecyclerView; //聊天区RV
+    //private RecyclerView mVideoRV; //视频区RV
     private ChatAdapter mChatAdapter = new ChatAdapter();  //聊天适配器
+    //private VideoAdapter mVideoAdapter = new VideoAdapter();
 
 
     private RTCRoomEventHandlerAdapter mIRtcRoomEventHandler = new RTCRoomEventHandlerAdapter() {
@@ -152,6 +156,7 @@ public class RTCRoomActivity extends AppCompatActivity {
         public void onRoomMessageReceived(String uid, String message) {
             super.onRoomMessageReceived(uid, message);
             showMessage(uid, message);
+            mRecyclerView.scrollToPosition(mChatAdapter.getItemCount()-1);
         }
 
 
@@ -196,14 +201,13 @@ public class RTCRoomActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_room);
 
-
         Intent intent = getIntent();
         String roomId = intent.getStringExtra(Constants.ROOM_ID_EXTRA);
         String userId = intent.getStringExtra(Constants.USER_ID_EXTRA);
-        String codeId = intent.getStringExtra(Constants.CODE_ID_EXTRA);
+        String token = intent.getStringExtra(Constants.TOKEN);
 
         initUI(roomId, userId);
-        initEngineAndJoinRoom(roomId, userId);
+        initEngineAndJoinRoom(roomId, userId, token);
         sendMessage(userId);
 
     }
@@ -234,9 +238,10 @@ public class RTCRoomActivity extends AppCompatActivity {
 
         mInputSendTv.setOnClickListener( (view -> {
             String inputMessage = mInputEt.getText().toString();
-            if (inputMessage.equals("")) Toast.makeText(this,"发送信息不可为空", Toast.LENGTH_SHORT).show();
+            if (inputMessage.equals("")) Toast.makeText(this,"Don't you want to say something?", Toast.LENGTH_SHORT).show();
             else {
                 mChatAdapter.addChatMsg(userId + ": " + inputMessage);
+                mRecyclerView.scrollToPosition(mChatAdapter.getItemCount()-1);
                 mInputEt.setText("");
                 mRTCRoom.sendRoomMessage(userId + ": " + inputMessage);
             }
@@ -244,16 +249,35 @@ public class RTCRoomActivity extends AppCompatActivity {
 
     }
 
-
-
     private void initUI(String roomId, String userId) {
         mSelfContainer = findViewById(R.id.self_video_container);
+        //mVideoRV = findViewById(R.id.remote_rv);
+        //inearLayoutManager layoutManager = new LinearLayoutManager(this);
+        //layoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
+        //mVideoRV.setLayoutManager(layoutManager);
+        //mVideoRV.setAdapter(mVideoAdapter);
+
+        //for (int i = 0; i < 7; i++) {
+        //    mRemoteList.add(mRemoteContainerArray[i]);
+        //}
+        //mVideoAdapter.notifyItems(mRemoteList);
+
         mRemoteContainerArray[0] = findViewById(R.id.remote_video_0_container);
         mRemoteContainerArray[1] = findViewById(R.id.remote_video_1_container);
         mRemoteContainerArray[2] = findViewById(R.id.remote_video_2_container);
+        mRemoteContainerArray[3] = findViewById(R.id.remote_video_3_container);
+        mRemoteContainerArray[4] = findViewById(R.id.remote_video_4_container);
+        mRemoteContainerArray[5] = findViewById(R.id.remote_video_5_container);
+        mRemoteContainerArray[6] = findViewById(R.id.remote_video_6_container);
+
         mUserIdTvArray[0] = findViewById(R.id.remote_video_0_user_id_tv);
         mUserIdTvArray[1] = findViewById(R.id.remote_video_1_user_id_tv);
         mUserIdTvArray[2] = findViewById(R.id.remote_video_2_user_id_tv);
+        mUserIdTvArray[3] = findViewById(R.id.remote_video_3_user_id_tv);
+        mUserIdTvArray[4] = findViewById(R.id.remote_video_4_user_id_tv);
+        mUserIdTvArray[5] = findViewById(R.id.remote_video_5_user_id_tv);
+        mUserIdTvArray[6] = findViewById(R.id.remote_video_6_user_id_tv);
+
         findViewById(R.id.switch_camera).setOnClickListener((v) -> onSwitchCameraClick());
         mSpeakerIv = findViewById(R.id.switch_audio_router);
         mAudioIv = findViewById(R.id.switch_local_audio);
@@ -268,7 +292,7 @@ public class RTCRoomActivity extends AppCompatActivity {
         userIDTV.setText(String.format("UserID:%s", userId));
     }
 
-    private void initEngineAndJoinRoom(String roomId, String userId) {
+    private void initEngineAndJoinRoom(String roomId, String userId, String token) {
         // 创建引擎
         mRTCVideo = RTCVideo.createRTCVideo(getApplicationContext(), Constants.APPID, mIRtcVideoEventHandler, null, null);
         // 设置视频发布参数
@@ -284,12 +308,12 @@ public class RTCRoomActivity extends AppCompatActivity {
         mRTCRoom.setRTCRoomEventHandler(mIRtcRoomEventHandler);
         RTCRoomConfig roomConfig = new RTCRoomConfig(ChannelProfile.CHANNEL_PROFILE_COMMUNICATION,
                 true, true, true);
-        int joinRoomRes = mRTCRoom.joinRoom(Constants.TOKEN,
+        int joinRoomRes = mRTCRoom.joinRoom(token,
                 UserInfo.create(userId, ""), roomConfig);
         Log.i("TAG", "initEngineAndJoinRoom: " + joinRoomRes);
     }
-    private void setLocalRenderView(String uid) {
 
+    private void setLocalRenderView(String uid) {
         VideoCanvas videoCanvas = new VideoCanvas();
         TextureView renderView = new TextureView(this);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
@@ -419,6 +443,7 @@ public class RTCRoomActivity extends AppCompatActivity {
     private void showMessage(String uid, String message) {
         runOnUiThread(() -> {
             mChatAdapter.addChatMsg(message);
+            //mRecyclerView.scrollToPosition(mChatAdapter.getItemCount()-1);
         });
     }
 }

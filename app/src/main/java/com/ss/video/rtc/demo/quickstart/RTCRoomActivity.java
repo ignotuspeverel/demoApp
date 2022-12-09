@@ -1,10 +1,8 @@
 package com.ss.video.rtc.demo.quickstart;
 
-import android.content.Context;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -18,15 +16,14 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.ss.bytertc.engine.RTCEngine;
 import com.ss.bytertc.engine.RTCRoom;
 import com.ss.bytertc.engine.RTCRoomConfig;
-import com.ss.bytertc.engine.type.RTCRoomStats;
 import com.ss.bytertc.engine.RTCVideo;
 import com.ss.bytertc.engine.UserInfo;
 import com.ss.bytertc.engine.VideoCanvas;
@@ -36,18 +33,14 @@ import com.ss.bytertc.engine.data.CameraId;
 import com.ss.bytertc.engine.data.RemoteStreamKey;
 import com.ss.bytertc.engine.data.StreamIndex;
 import com.ss.bytertc.engine.data.VideoFrameInfo;
-import com.ss.bytertc.engine.handler.IRTCEngineEventHandler;
 import com.ss.bytertc.engine.handler.IRTCVideoEventHandler;
 import com.ss.bytertc.engine.type.ChannelProfile;
 import com.ss.bytertc.engine.type.MediaStreamType;
 import com.ss.rtc.demo.quickstart.R;
 
-
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
+import java.lang.ref.WeakReference;
 import java.util.Locale;
-import java.util.TreeMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * VolcEngineRTC 视频通话的主页面
@@ -86,7 +79,7 @@ import java.util.TreeMap;
  *
  * 详细的API文档参见{https://www.volcengine.com/docs/6348/70080}
  */
-public class RTCRoomActivity extends AppCompatActivity {
+public class RTCRoomActivity extends AppCompatActivity implements OnChatHideListener{
     private String code;
     //private TreeMap<String, String> room = new TreeMap<>();
 
@@ -115,6 +108,80 @@ public class RTCRoomActivity extends AppCompatActivity {
     private ChatAdapter mChatAdapter = new ChatAdapter();  //聊天适配器
     //private VideoAdapter mVideoAdapter = new VideoAdapter();
 
+    public long LastChatActivityTime = 0; //上一次聊天区活动时间
+    public final ReentrantLock ChatActivityTimeLock = new ReentrantLock(); //聊天区活动时间锁
+
+    ChatHideAsyncTask mTask= new ChatHideAsyncTask(this);
+
+    @Override
+    public void setChatVisibility(int visibility) {
+        mRecyclerView.setVisibility(visibility);
+    }
+
+    @Override
+    public void setChatAlpha(float alpha) {
+        mRecyclerView.setAlpha(alpha);
+    }
+
+
+    private static class ChatHideAsyncTask extends AsyncTask<Object, Void, Void> {
+
+        private WeakReference<RTCRoomActivity> activityReference;
+        OnChatHideListener listener;
+
+        ChatHideAsyncTask(RTCRoomActivity context) {
+            activityReference = new WeakReference<>(context);
+            listener = context;
+        }
+
+        private double NormalizedTunableSigmoidFunction(double x, double k) {
+            return (x - k * x) / (k - 2 * k * Math.abs(x) + 1);
+        }
+
+        @Override
+        protected Void doInBackground(Object[] objects) {
+            RTCRoomActivity activity = activityReference.get();
+            RecyclerView mRecyclerView = activity.findViewById(R.id.main_chat_rv);
+            if (activity.isFinishing()) return null;
+            while (true) {
+                if(activity.ChatActivityTimeLock.tryLock()){
+                    try {
+                        if (System.currentTimeMillis() - activity.LastChatActivityTime > 5000 && mRecyclerView.getVisibility() == View.VISIBLE) {
+                            double alpha = (10000 - System.currentTimeMillis() + activity.LastChatActivityTime) / 5000f;
+                            if (alpha < 0) alpha = 0;
+                            if (alpha > 1) alpha = 1;
+                            alpha = NormalizedTunableSigmoidFunction(alpha, -0.75);
+                            listener.setChatAlpha((float) alpha);
+                        }
+                        if (System.currentTimeMillis() - activity.LastChatActivityTime > 10000) {
+                            listener.setChatVisibility(View.INVISIBLE);
+                        }
+                    }
+                    catch (Exception e){
+                        e.printStackTrace();
+                    }
+                    finally {
+                        activity.ChatActivityTimeLock.unlock();
+                    }
+                }
+
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    break;
+                }
+
+                if (activity.isFinishing()){
+                    break;
+                }
+                if (isCancelled()){
+                    break;
+                }
+            }
+            return null;
+        }
+    }
 
     private RTCRoomEventHandlerAdapter mIRtcRoomEventHandler = new RTCRoomEventHandlerAdapter() {
 
@@ -157,6 +224,11 @@ public class RTCRoomActivity extends AppCompatActivity {
             super.onRoomMessageReceived(uid, message);
             showMessage(uid, message);
             mRecyclerView.scrollToPosition(mChatAdapter.getItemCount()-1);
+            ChatActivityTimeLock.lock();
+            mRecyclerView.setVisibility(View.VISIBLE);
+            mRecyclerView.setAlpha(1);
+            LastChatActivityTime = System.currentTimeMillis();
+            ChatActivityTimeLock.unlock();
         }
 
 
@@ -210,6 +282,44 @@ public class RTCRoomActivity extends AppCompatActivity {
         initEngineAndJoinRoom(roomId, userId, token);
         sendMessage(userId);
 
+        mRecyclerView = findViewById(R.id.main_chat_rv);
+
+        mRecyclerView.addOnItemTouchListener(new RecyclerView.OnItemTouchListener() {
+            @Override
+            public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
+                ChatActivityTimeLock.lock();
+                mRecyclerView.setVisibility(View.VISIBLE);
+                mRecyclerView.setAlpha(1);
+                LastChatActivityTime = System.currentTimeMillis();
+                ChatActivityTimeLock.unlock();
+                return false;
+            }
+
+            @Override
+            public void onTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent e) {
+                ChatActivityTimeLock.lock();
+                mRecyclerView.setVisibility(View.VISIBLE);
+                mRecyclerView.setAlpha(1);
+                LastChatActivityTime = System.currentTimeMillis();
+                ChatActivityTimeLock.unlock();
+            }
+
+            @Override
+            public void onRequestDisallowInterceptTouchEvent(boolean disallowIntercept) {
+
+            }
+        });
+
+        mTask.execute();
+
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mRTCRoom.leaveRoom();
+        mRTCRoom.destroy();
+        mTask.cancel(true);
     }
 
     //光标和软键盘的问题
@@ -234,9 +344,23 @@ public class RTCRoomActivity extends AppCompatActivity {
         mInputSendTv = findViewById(R.id.input_send);
         mInputEt = findViewById(R.id.input_et);
 
-        mInputEt.setOnClickListener((v) -> {mInputEt.setCursorVisible(true);});
+        mInputEt.setOnClickListener((v) -> {
+            mInputEt.setCursorVisible(true);
+
+            ChatActivityTimeLock.lock();
+            mRecyclerView.setVisibility(View.VISIBLE);
+            mRecyclerView.setAlpha(1);
+            LastChatActivityTime = System.currentTimeMillis();
+            ChatActivityTimeLock.unlock();
+        });
 
         mInputSendTv.setOnClickListener( (view -> {
+            Log.d("ChatActivityTimeLock", String.valueOf(ChatActivityTimeLock.getHoldCount()));
+            ChatActivityTimeLock.lock();
+            mRecyclerView.setVisibility(View.VISIBLE);
+            mRecyclerView.setAlpha(1);
+            LastChatActivityTime = System.currentTimeMillis();
+            ChatActivityTimeLock.unlock();
             String inputMessage = mInputEt.getText().toString();
             if (inputMessage.equals("")) Toast.makeText(this,"Don't you want to say something?", Toast.LENGTH_SHORT).show();
             else {

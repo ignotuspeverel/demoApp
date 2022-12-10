@@ -24,6 +24,8 @@
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintTop_toBottomOf="@id/self_video_container" />
 
+
+
         <TextView
             android:id="@+id/room_id_text"
             android:layout_width="wrap_content"
@@ -40,6 +42,7 @@
             android:textStyle="bold"
             tools:text="ID:userid" />
 
+
         <ImageView
             android:id="@+id/switch_audio_router"
             android:layout_width="32dp"
@@ -51,7 +54,7 @@
             app:layout_constraintTop_toBottomOf="@id/self_video_container" />
     </FrameLayout>
 
-    <FrameLayout
+    <LinearLayout
         android:id="@+id/bottom_bar"
         android:layout_width="match_parent"
         android:layout_height="80dp"
@@ -59,13 +62,23 @@
         android:paddingBottom="10dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
+
         <ImageView
             android:id="@+id/switch_local_audio"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_gravity="center_vertical"
+            android:layout_weight="1"
             android:layout_marginLeft="16dp"
             android:src="@drawable/normal_audio" />
+
+        <ImageView
+            android:id="@+id/ScreenshareOnIV"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center_vertical|right"
+            android:layout_weight="1.5"
+            app:srcCompat="@drawable/screen_share_on" />
 
 
         <ImageView
@@ -73,16 +86,29 @@
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_gravity="center"
+            android:layout_weight="1.5"
             android:src="@drawable/hang_up" />
+
+        <ImageView
+            android:id="@+id/ScreenshareOffIV"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center_vertical|right"
+            android:layout_weight="1.5"
+            app:srcCompat="@drawable/screen_share_off" />
 
         <ImageView
             android:id="@+id/switch_local_video"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_gravity="center_vertical|right"
+            android:layout_weight="1"
             android:layout_marginRight="16dp"
             android:src="@drawable/normal_video" />
-    </FrameLayout>
+
+
+
+    </LinearLayout>
 
     <FrameLayout
         android:id="@+id/self_video_container"
@@ -236,15 +262,11 @@
         app:layout_constraintBottom_toBottomOf="@id/remote_video_6_container"
         app:layout_constraintRight_toRightOf="@id/remote_video_6_container" />
 
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/main_chat_rv"
+    <VideoView
+        android:id="@+id/videoPlay"
         android:layout_width="match_parent"
         android:layout_height="200dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="20dp"
-        android:layout_marginEnd="16dp"
+        android:layout_marginStart="0dp"
         android:layout_marginBottom="160dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -252,6 +274,36 @@
         app:layout_constraintLeft_toRightOf="parent"
         app:layout_constraintRight_toLeftOf="parent"
         app:layout_constraintVertical_bias="0.996"
+        android:visibility="invisible"
+        />
+
+    <FrameLayout
+        android:background="@color/transparent"
+        android:id="@+id/ShareScreenFL"
+        android:layout_width="match_parent"
+        android:layout_height="270dp"
+        android:layout_marginBottom="140dp"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+
+    </FrameLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/main_chat_rv"
+        android:layout_width="match_parent"
+        android:background="@color/transparent"
+        android:layout_height="200dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="160dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintLeft_toRightOf="parent"
+        app:layout_constraintRight_toLeftOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         tools:listitem="@layout/item_voice_chat_demo_chat" />
 
     <FrameLayout
@@ -311,5 +363,7 @@
             android:textColor="@color/white"
             android:textSize="14dp" />
     </FrameLayout>
+
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

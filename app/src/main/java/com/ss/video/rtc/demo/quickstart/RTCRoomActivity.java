@@ -1,8 +1,17 @@
 package com.ss.video.rtc.demo.quickstart;
 
+import android.Manifest;
+import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.media.projection.MediaProjectionManager;
+import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -13,12 +22,16 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.MediaController;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -31,12 +44,20 @@ import com.ss.bytertc.engine.VideoEncoderConfig;
 import com.ss.bytertc.engine.data.AudioRoute;
 import com.ss.bytertc.engine.data.CameraId;
 import com.ss.bytertc.engine.data.RemoteStreamKey;
+import com.ss.bytertc.engine.data.ScreenMediaType;
 import com.ss.bytertc.engine.data.StreamIndex;
 import com.ss.bytertc.engine.data.VideoFrameInfo;
+import com.ss.bytertc.engine.data.VideoSourceType;
 import com.ss.bytertc.engine.handler.IRTCVideoEventHandler;
 import com.ss.bytertc.engine.type.ChannelProfile;
+import com.ss.bytertc.engine.type.MediaDeviceState;
 import com.ss.bytertc.engine.type.MediaStreamType;
+import com.ss.bytertc.engine.type.StreamRemoveReason;
+import com.ss.bytertc.engine.type.VideoDeviceType;
+import com.ss.bytertc.engine.video.IVideoSink;
 import com.ss.rtc.demo.quickstart.R;
+
+import org.webrtc.RXScreenCaptureService;
 
 import java.lang.ref.WeakReference;
 import java.util.Locale;
@@ -110,6 +131,54 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
 
     public long LastChatActivityTime = 0; //上一次聊天区活动时间
     public final ReentrantLock ChatActivityTimeLock = new ReentrantLock(); //聊天区活动时间锁
+
+    private String mRoomId;
+    private VideoView videoPlay;
+    private MediaController mediaController;
+    private static int REQUEST_VIDEO_CODE = 1;
+    public static final int REQUEST_CODE_OF_SCREEN_SHARING = 101;
+
+    public void requestForScreenSharing() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            Log.e("ShareScreen","当前系统版本过低，无法支持屏幕共享");
+            return;
+        }
+        MediaProjectionManager projectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+        if (projectionManager != null) {
+            startActivityForResult(projectionManager.createScreenCaptureIntent(), REQUEST_CODE_OF_SCREEN_SHARING);
+        } else {
+            Log.e("ShareScreen","当前系统版本过低，无法支持屏幕共享");
+        }
+    }
+
+    private void startScreenShare(Intent data) {
+        startRXScreenCaptureService(data);
+        //编码参数
+        VideoEncoderConfig config = new VideoEncoderConfig();
+        config.width = 720;
+        config.height = 1280;
+        config.frameRate = 15;
+        config.maxBitrate = 1600;
+        mRTCVideo.setScreenVideoEncoderConfig(config);
+        // 开启屏幕视频数据采集
+        mRTCVideo.startScreenCapture(ScreenMediaType.SCREEN_MEDIA_TYPE_VIDEO_AND_AUDIO, data);
+        Log.i("progress","ready");
+    }
+
+    private void startRXScreenCaptureService(@NonNull Intent data) {
+        Context context = getApplicationContext();//Utilities.getApplicationContext();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Intent intent = new Intent();
+            intent.putExtra(RXScreenCaptureService.KEY_LARGE_ICON, R.drawable.launcher_quick_start);
+            intent.putExtra(RXScreenCaptureService.KEY_SMALL_ICON, R.drawable.launcher_quick_start);
+            intent.putExtra(RXScreenCaptureService.KEY_LAUNCH_ACTIVITY, RTCRoomActivity.this.getClass().getCanonicalName());//mHostActivity.getClass().getCanonicalName()
+            intent.putExtra(RXScreenCaptureService.KEY_CONTENT_TEXT, "正在录制/投射您的屏幕");
+            intent.putExtra(RXScreenCaptureService.KEY_RESULT_DATA, data);
+            //前台服务
+            context.startForegroundService(RXScreenCaptureService.getServiceIntent(context, RXScreenCaptureService.COMMAND_LAUNCH, intent));
+            Log.i("progress","前台已就位");
+        }
+    }
 
     ChatHideAsyncTask mTask= new ChatHideAsyncTask(this);
 
@@ -207,6 +276,45 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
         }
 
         @Override
+        public void onUserPublishScreen(String uid, MediaStreamType type) {
+            if (type != MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO) {
+                FrameLayout fl = findViewById(R.id.ShareScreenFL);
+                runOnUiThread(() -> setRemoteView(new RemoteStreamKey(mRoomId, uid, StreamIndex.STREAM_INDEX_SCREEN), fl));
+                //runOnUiThread(() -> setRemoteView(mRoomId, uid));//可能有问题
+                Log.i("progress","有人在共享屏幕");
+            }
+        }
+
+        @Override
+        public void onUserUnpublishScreen(String uid, MediaStreamType type, StreamRemoveReason reason) {
+            if (type != MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO) {
+                runOnUiThread(() -> setRemoteView(new RemoteStreamKey(mRoomId, uid, StreamIndex.STREAM_INDEX_MAIN)));
+                FrameLayout fl = findViewById(R.id.ShareScreenFL);
+                fl.removeAllViews();
+                Log.i("progress","有人取消了共享屏幕");
+            }
+        }
+
+        /**
+         * 房间内新增远端摄像头/麦克风采集音视频流的回调。
+         */
+        //@Override
+        //public void onUserPublishStream(String uid, MediaStreamType type) {
+        //    //Log.d(TAG, "onUserPublishStream: " + uid);
+        //    if (type != MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO) {
+        //        runOnUiThread(() -> setRemoteView(new RemoteStreamKey(mRoomId, uid, StreamIndex.STREAM_INDEX_MAIN)));
+        //    }
+        //}
+
+        //@Override
+        //public void onUserUnpublishStream(String uid, MediaStreamType type, StreamRemoveReason reason) {
+        //    //Log.d(TAG, "onUserUnPublishStream: " + uid);
+        //    if (type != MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO) {
+        //        runOnUiThread(() -> removeRemoteView(uid));
+        //    }
+        //}
+
+        @Override
         public void onRoomMessageSendResult(long msgid, int error) {
             super.onRoomMessageSendResult(msgid, error);
             String tip;
@@ -244,6 +352,7 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
             super.onFirstRemoteVideoFrameDecoded(remoteStreamKey, frameInfo);
             Log.d("IRTCVideoEventHandler", "onFirstRemoteVideoFrame: " + remoteStreamKey.toString());
             runOnUiThread(() -> setRemoteView(remoteStreamKey.getRoomId(), remoteStreamKey.getUserId()));
+            Log.i("progress","远端视频正在解码");
         }
 
         /**
@@ -264,6 +373,23 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
             Log.d("IRTCVideoEventHandler", "onError: " + err);
             showAlertDialog(String.format(Locale.US, "error: %d", err));
         }
+
+        @Override
+        public void onVideoDeviceStateChanged(String deviceId, VideoDeviceType deviceType, int deviceState, int deviceError) {
+            if (deviceType == VideoDeviceType.VIDEO_DEVICE_TYPE_SCREEN_CAPTURE_DEVICE) {
+                if (deviceState == MediaDeviceState.MEDIA_DEVICE_STATE_STARTED) {
+                    mRTCRoom.publishScreen(MediaStreamType.RTC_MEDIA_STREAM_TYPE_BOTH);
+                    mRTCVideo.setVideoSourceType(StreamIndex.STREAM_INDEX_SCREEN, VideoSourceType.VIDEO_SOURCE_TYPE_INTERNAL);
+                    Log.i("progress","ScreenPublished");
+                } else if (deviceState == MediaDeviceState.MEDIA_DEVICE_STATE_STOPPED
+                        || deviceState == MediaDeviceState.MEDIA_DEVICE_STATE_RUNTIMEERROR) {
+                    mRTCRoom.unpublishScreen(MediaStreamType.RTC_MEDIA_STREAM_TYPE_BOTH);
+                    mRTCRoom.publishStream(MediaStreamType.RTC_MEDIA_STREAM_TYPE_VIDEO);
+                    Log.i("progress","ScreenPublishCanceled");
+                }
+            }
+        }
+
     };
 
 
@@ -274,6 +400,7 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
         setContentView(R.layout.activity_room);
 
         Intent intent = getIntent();
+        mRoomId = intent.getStringExtra(Constants.ROOM_ID_EXTRA);
         String roomId = intent.getStringExtra(Constants.ROOM_ID_EXTRA);
         String userId = intent.getStringExtra(Constants.USER_ID_EXTRA);
         String token = intent.getStringExtra(Constants.TOKEN);
@@ -375,6 +502,7 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
 
     private void initUI(String roomId, String userId) {
         mSelfContainer = findViewById(R.id.self_video_container);
+        videoPlay = findViewById(R.id.videoPlay);
         //mVideoRV = findViewById(R.id.remote_rv);
         //inearLayoutManager layoutManager = new LinearLayoutManager(this);
         //layoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
@@ -403,6 +531,9 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
         mUserIdTvArray[6] = findViewById(R.id.remote_video_6_user_id_tv);
 
         findViewById(R.id.switch_camera).setOnClickListener((v) -> onSwitchCameraClick());
+        //findViewById(R.id.selectVideo).setOnClickListener((v) -> selectVideo());
+        findViewById(R.id.ScreenshareOffIV).setOnClickListener((v) -> endShareScreen());
+        findViewById(R.id.ScreenshareOnIV).setOnClickListener((v) -> shareScreen());
         mSpeakerIv = findViewById(R.id.switch_audio_router);
         mAudioIv = findViewById(R.id.switch_local_audio);
         mVideoIv = findViewById(R.id.switch_local_video);
@@ -414,6 +545,62 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
         TextView userIDTV = findViewById(R.id.self_video_user_id_tv);
         roomIDTV.setText(String.format("RoomID:%s", roomId));
         userIDTV.setText(String.format("UserID:%s", userId));
+    }
+
+    private void stopScreenShare() {
+        // 停止屏幕数据采集
+        mRTCVideo.stopScreenCapture();
+        mRTCVideo.startVideoCapture();
+        Log.i("progress","stop_step_one");
+    }
+
+    private void selectVideo(){
+        Intent intent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
+        startActivityForResult(intent, REQUEST_VIDEO_CODE);
+    }
+
+    private void shareScreen(){
+        requestForScreenSharing();
+    }
+
+    private void endShareScreen(){
+        stopScreenShare();
+        FrameLayout fl = findViewById(R.id.ShareScreenFL);
+        fl.removeAllViews();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        if (requestCode == REQUEST_VIDEO_CODE && resultCode == Activity.RESULT_OK) {
+            Uri uri = data.getData();
+            ContentResolver cr = this.getContentResolver();
+            Cursor cursor = cr.query(uri, null, null, null, null);
+            if (cursor != null) {
+                if (cursor.moveToFirst()) {
+                    String videoPath = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA));
+
+                    ActivityCompat.requestPermissions(RTCRoomActivity.this,
+                            new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+                            1);
+
+                    videoPlay.setVisibility(View.VISIBLE);
+                    videoPlay.setVideoPath(videoPath);
+                    mediaController = new MediaController(this);
+                    videoPlay.setMediaController(mediaController);
+                    videoPlay.requestFocus();
+                }
+                cursor.close();
+            }
+        }
+        else if (requestCode == REQUEST_CODE_OF_SCREEN_SHARING && resultCode == Activity.RESULT_OK) {
+            mRTCVideo.stopVideoCapture();
+            startScreenShare(data);
+            mRTCRoom.unpublishStream(MediaStreamType.RTC_MEDIA_STREAM_TYPE_VIDEO);
+            Log.i("progress","mRTCRoom.unpublishStream");
+        }
+        else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
     }
 
     private void initEngineAndJoinRoom(String roomId, String userId, String token) {
@@ -469,6 +656,73 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
         videoCanvas.renderMode = VideoCanvas.RENDER_MODE_HIDDEN;
         // 设置远端用户视频渲染视图
         mRTCVideo.setRemoteVideoCanvas(uid, StreamIndex.STREAM_INDEX_MAIN, videoCanvas);
+    }
+
+    private final RemoteStreamKey[] mShowRemoteStreamArray = new RemoteStreamKey[7];
+    private void setRemoteView(RemoteStreamKey remoteStreamKey) {
+        int renderIndex = -1;
+        String uid = remoteStreamKey.getUserId();
+        if (TextUtils.isEmpty(uid)) return;
+        int firstEmptyIndex = -1;
+        for (int i = 0; i < mShowRemoteStreamArray.length; i++) {
+            String showedUid = mShowRemoteStreamArray[i] == null ? null : mShowRemoteStreamArray[i].getUserId();
+            if (TextUtils.equals(uid, showedUid)) {
+                renderIndex = i;
+                break;
+            }
+            if (TextUtils.isEmpty(showedUid) && firstEmptyIndex < 0) {
+                firstEmptyIndex = i;
+            }
+        }
+        if (renderIndex < 0 && firstEmptyIndex >= 0) {
+            renderIndex = firstEmptyIndex;
+        }
+        if (renderIndex < 0) {
+            return;
+        }
+        mShowRemoteStreamArray[renderIndex] = remoteStreamKey;
+        boolean sharingScreen = remoteStreamKey.getStreamIndex() == StreamIndex.STREAM_INDEX_SCREEN;
+        mUserIdTvArray[renderIndex].setText(sharingScreen ? String.format("%s屏幕分享", uid) : String.format("UserId:%s", uid));
+        setScreenRemoteRenderView(remoteStreamKey, mRemoteContainerArray[renderIndex]);
+    }
+
+    private void setRemoteView(RemoteStreamKey remoteStreamKey, FrameLayout fl) {
+        int renderIndex = -1;
+        String uid = remoteStreamKey.getUserId();
+        if (TextUtils.isEmpty(uid)) return;
+        int firstEmptyIndex = -1;
+        for (int i = 0; i < mShowRemoteStreamArray.length; i++) {
+            String showedUid = mShowRemoteStreamArray[i] == null ? null : mShowRemoteStreamArray[i].getUserId();
+            if (TextUtils.equals(uid, showedUid)) {
+                renderIndex = i;
+                break;
+            }
+            if (TextUtils.isEmpty(showedUid) && firstEmptyIndex < 0) {
+                firstEmptyIndex = i;
+            }
+        }
+        if (renderIndex < 0 && firstEmptyIndex >= 0) {
+            renderIndex = firstEmptyIndex;
+        }
+        if (renderIndex < 0) {
+            return;
+        }
+        mShowRemoteStreamArray[renderIndex] = remoteStreamKey;
+        boolean sharingScreen = remoteStreamKey.getStreamIndex() == StreamIndex.STREAM_INDEX_SCREEN;
+        mUserIdTvArray[renderIndex].setText(sharingScreen ? String.format("%s屏幕分享", uid) : String.format("UserId:%s", uid));
+        setScreenRemoteRenderView(remoteStreamKey, mRemoteContainerArray[renderIndex]);
+        setScreenRemoteRenderView(remoteStreamKey, fl);
+    }
+
+    private void setScreenRemoteRenderView(RemoteStreamKey remoteStreamKey, FrameLayout container){
+        IVideoSink videoSink = new CustomRenderView(this);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT);
+        container.removeAllViews();
+        container.addView((View) videoSink, params);
+        mRTCVideo.setRemoteVideoSink(remoteStreamKey, videoSink, IVideoSink.PixelFormat.I420);
+
     }
 
     private void setRemoteView(String roomId, String uid) {

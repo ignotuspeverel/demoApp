@@ -279,7 +279,8 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
         public void onUserPublishScreen(String uid, MediaStreamType type) {
             if (type != MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO) {
                 FrameLayout fl = findViewById(R.id.ShareScreenFL);
-                runOnUiThread(() -> setRemoteView(new RemoteStreamKey(mRoomId, uid, StreamIndex.STREAM_INDEX_SCREEN), fl));
+                runOnUiThread(() -> removeRemoteView(uid));
+                runOnUiThread(() -> setRemoteView_with_share(new RemoteStreamKey(mRoomId, uid, StreamIndex.STREAM_INDEX_SCREEN), fl));
                 //runOnUiThread(() -> setRemoteView(mRoomId, uid));//可能有问题
                 Log.i("progress","有人在共享屏幕");
             }
@@ -288,7 +289,8 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
         @Override
         public void onUserUnpublishScreen(String uid, MediaStreamType type, StreamRemoveReason reason) {
             if (type != MediaStreamType.RTC_MEDIA_STREAM_TYPE_AUDIO) {
-                runOnUiThread(() -> setRemoteView(new RemoteStreamKey(mRoomId, uid, StreamIndex.STREAM_INDEX_MAIN)));
+                runOnUiThread(() -> removeRemoteView(uid));
+                runOnUiThread(() -> setRemoteView_with_share(new RemoteStreamKey(mRoomId, uid, StreamIndex.STREAM_INDEX_MAIN)));
                 FrameLayout fl = findViewById(R.id.ShareScreenFL);
                 fl.removeAllViews();
                 Log.i("progress","有人取消了共享屏幕");
@@ -544,7 +546,7 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
         TextView roomIDTV = findViewById(R.id.room_id_text);
         TextView userIDTV = findViewById(R.id.self_video_user_id_tv);
         roomIDTV.setText(String.format("RoomID:%s", roomId));
-        userIDTV.setText(String.format("UserID:%s", userId));
+        userIDTV.setText(String.format("%s", userId));
     }
 
     private void stopScreenShare() {
@@ -659,60 +661,52 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
     }
 
     private final RemoteStreamKey[] mShowRemoteStreamArray = new RemoteStreamKey[7];
-    private void setRemoteView(RemoteStreamKey remoteStreamKey) {
-        int renderIndex = -1;
+    private void setRemoteView_with_share(RemoteStreamKey remoteStreamKey) {
         String uid = remoteStreamKey.getUserId();
         if (TextUtils.isEmpty(uid)) return;
-        int firstEmptyIndex = -1;
-        for (int i = 0; i < mShowRemoteStreamArray.length; i++) {
-            String showedUid = mShowRemoteStreamArray[i] == null ? null : mShowRemoteStreamArray[i].getUserId();
-            if (TextUtils.equals(uid, showedUid)) {
-                renderIndex = i;
+        int emptyInx = -1;
+        for (int i = 0; i < mShowUidArray.length; i++) {
+            if (TextUtils.isEmpty(mShowUidArray[i]) && emptyInx == -1 || TextUtils.equals(mShowUidArray[i], uid)) {
+                emptyInx = i;
                 break;
-            }
-            if (TextUtils.isEmpty(showedUid) && firstEmptyIndex < 0) {
-                firstEmptyIndex = i;
+            } else if (TextUtils.equals(uid, mShowUidArray[i])) {
+                return;
             }
         }
-        if (renderIndex < 0 && firstEmptyIndex >= 0) {
-            renderIndex = firstEmptyIndex;
-        }
-        if (renderIndex < 0) {
+        if (emptyInx < 0) {
             return;
         }
-        mShowRemoteStreamArray[renderIndex] = remoteStreamKey;
+        mShowUidArray[emptyInx] = uid;
+        mUserIdTvArray[emptyInx].setText(uid);
+        mShowRemoteStreamArray[emptyInx] = remoteStreamKey;
         boolean sharingScreen = remoteStreamKey.getStreamIndex() == StreamIndex.STREAM_INDEX_SCREEN;
-        mUserIdTvArray[renderIndex].setText(sharingScreen ? String.format("%s屏幕分享", uid) : String.format("UserId:%s", uid));
-        setScreenRemoteRenderView(remoteStreamKey, mRemoteContainerArray[renderIndex]);
+        // mUserIdTvArray[renderIndex].setText(sharingScreen ? String.format("%s屏幕分享", uid) : String.format("%s", uid));
+        setScreenRemoteRenderView(remoteStreamKey, mRemoteContainerArray[emptyInx]);
     }
 
-    private void setRemoteView(RemoteStreamKey remoteStreamKey, FrameLayout fl) {
-        int renderIndex = -1;
+    private void setRemoteView_with_share(RemoteStreamKey remoteStreamKey, FrameLayout fl) {
         String uid = remoteStreamKey.getUserId();
         if (TextUtils.isEmpty(uid)) return;
-        int firstEmptyIndex = -1;
-        for (int i = 0; i < mShowRemoteStreamArray.length; i++) {
-            String showedUid = mShowRemoteStreamArray[i] == null ? null : mShowRemoteStreamArray[i].getUserId();
-            if (TextUtils.equals(uid, showedUid)) {
-                renderIndex = i;
+        int emptyInx = -1;
+        for (int i = 0; i < mShowUidArray.length; i++) {
+            if (TextUtils.isEmpty(mShowUidArray[i]) && emptyInx == -1 || TextUtils.equals(mShowUidArray[i], uid)) {
+                emptyInx = i;
                 break;
-            }
-            if (TextUtils.isEmpty(showedUid) && firstEmptyIndex < 0) {
-                firstEmptyIndex = i;
+            } else if (TextUtils.equals(uid, mShowUidArray[i])) {
+                return;
             }
         }
-        if (renderIndex < 0 && firstEmptyIndex >= 0) {
-            renderIndex = firstEmptyIndex;
-        }
-        if (renderIndex < 0) {
+        if (emptyInx < 0) {
             return;
         }
-        mShowRemoteStreamArray[renderIndex] = remoteStreamKey;
+        mShowUidArray[emptyInx] = uid;
+        mUserIdTvArray[emptyInx].setText(uid);
+        mShowRemoteStreamArray[emptyInx] = remoteStreamKey;
         boolean sharingScreen = remoteStreamKey.getStreamIndex() == StreamIndex.STREAM_INDEX_SCREEN;
-        mUserIdTvArray[renderIndex].setText(sharingScreen ? String.format("%s屏幕分享", uid) : String.format("UserId:%s", uid));
-        setScreenRemoteRenderView(remoteStreamKey, mRemoteContainerArray[renderIndex]);
+        // mUserIdTvArray[renderIndex].setText(sharingScreen ? String.format("%s屏幕分享", uid) : String.format("%s", uid));
+        setScreenRemoteRenderView(remoteStreamKey, mRemoteContainerArray[emptyInx]);
         setScreenRemoteRenderView(remoteStreamKey, fl);
-    }
+}
 
     private void setScreenRemoteRenderView(RemoteStreamKey remoteStreamKey, FrameLayout container){
         IVideoSink videoSink = new CustomRenderView(this);
@@ -738,7 +732,7 @@ public class RTCRoomActivity extends AppCompatActivity implements OnChatHideList
             return;
         }
         mShowUidArray[emptyInx] = uid;
-        mUserIdTvArray[emptyInx].setText(String.format("UserId:%s", uid));
+        mUserIdTvArray[emptyInx].setText(uid);
         setRemoteRenderView(roomId, uid, mRemoteContainerArray[emptyInx]);
     }
 
